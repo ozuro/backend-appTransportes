@@ -47,4 +47,34 @@ class Company extends Model
             ->withPivot(['role_id', 'is_owner', 'is_active', 'joined_at'])
             ->withTimestamps();
     }
+
+    public function clients()
+    {
+        return $this->hasMany(Client::class);
+    }
+
+    public function vehicles()
+    {
+        return $this->hasMany(Vehicle::class);
+    }
+
+    public function drivers()
+    {
+        return $this->hasMany(Driver::class);
+    }
+
+    public function transportServices()
+    {
+        return $this->hasMany(TransportService::class);
+    }
+
+    public function quotations()
+    {
+        return $this->hasMany(Quotation::class);
+    }
+
+    public function operatingExpenses()
+    {
+        return $this->hasMany(OperatingExpense::class);
+    }
 }

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\CreateCompanyRequest;
+use App\Http\Requests\Auth\FirebaseGoogleLoginRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterCompanyOwnerRequest;
 use App\Http\Resources\Auth\AuthUserResource;
@@ -40,6 +42,18 @@ class AuthController extends Controller
         ]);
     }
 
+    public function firebaseGoogleLogin(FirebaseGoogleLoginRequest $request): JsonResponse
+    {
+        $result = $this->authService->loginWithFirebaseGoogle($request->validated());
+
+        return response()->json([
+            'message' => 'Inicio de sesión con Google exitoso.',
+            'token' => $result['token'],
+            'requires_company' => $result['requires_company'],
+            'user' => new AuthUserResource($result['user']),
+        ]);
+    }
+
     public function me(Request $request): JsonResponse
     {
         $user = $request->user()->load('companies');
@@ -56,5 +70,16 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Sesión cerrada correctamente.',
         ]);
+    }
+
+    public function createCompany(Request $request, CreateCompanyRequest $companyRequest): JsonResponse
+    {
+        $result = $this->authService->createCompanyForUser($request->user(), $companyRequest->validated());
+
+        return response()->json([
+            'message' => 'Empresa creada correctamente.',
+            'company' => $result['company'],
+            'user' => new AuthUserResource($result['user']),
+        ], 201);
     }
 }

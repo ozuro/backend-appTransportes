@@ -25,6 +25,8 @@ class User extends Authenticatable
         'phone',
         'document_type',
         'document_number',
+        'firebase_uid',
+        'avatar_url',
         'password',
         'auth_provider',
         'is_active',
