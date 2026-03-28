@@ -32,12 +32,14 @@ class ClientController extends Controller
         $company = $this->companyContext->resolve($request, $request->user());
         $data = $request->validated();
 
-        $client = Client::create([
-            ...$data,
-            'company_id' => $company->id,
-            'category' => $data['category'] ?? 'occasional',
-            'is_active' => $data['is_active'] ?? true,
-        ]);
+        $client = Client::create(array_merge(
+            $data,
+            [
+                'company_id' => $company->id,
+                'category' => $data['category'] ?? 'occasional',
+                'is_active' => $data['is_active'] ?? true,
+            ]
+        ));
 
         return (new ClientResource($client))->response()->setStatusCode(201);
     }

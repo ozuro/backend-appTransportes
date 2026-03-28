@@ -40,13 +40,15 @@ class VehicleController extends Controller
             ]);
         }
 
-        $vehicle = Vehicle::create([
-            ...$data,
-            'company_id' => $company->id,
-            'plate' => $plate,
-            'operational_status' => $data['operational_status'] ?? 'active',
-            'is_active' => $data['is_active'] ?? true,
-        ]);
+        $vehicle = Vehicle::create(array_merge(
+            $data,
+            [
+                'company_id' => $company->id,
+                'plate' => $plate,
+                'operational_status' => $data['operational_status'] ?? 'active',
+                'is_active' => $data['is_active'] ?? true,
+            ]
+        ));
 
         return (new VehicleResource($vehicle))->response()->setStatusCode(201);
     }

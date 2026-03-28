@@ -37,10 +37,12 @@ class OperatingExpenseController extends Controller
 
         $this->validateRelations($company->id, $data);
 
-        $expense = OperatingExpense::create([
-            ...$data,
-            'company_id' => $company->id,
-        ]);
+        $expense = OperatingExpense::create(array_merge(
+            $data,
+            [
+                'company_id' => $company->id,
+            ]
+        ));
 
         return (new OperatingExpenseResource($expense->load('vehicle')))->response()->setStatusCode(201);
     }

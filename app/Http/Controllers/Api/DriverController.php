@@ -37,12 +37,14 @@ class DriverController extends Controller
         $this->validateAssignedVehicle($company->id, $data['assigned_vehicle_id'] ?? null);
         $this->validateLicenseNumber($data['license_number']);
 
-        $driver = Driver::create([
-            ...$data,
-            'company_id' => $company->id,
-            'status' => $data['status'] ?? 'available',
-            'is_active' => $data['is_active'] ?? true,
-        ]);
+        $driver = Driver::create(array_merge(
+            $data,
+            [
+                'company_id' => $company->id,
+                'status' => $data['status'] ?? 'available',
+                'is_active' => $data['is_active'] ?? true,
+            ]
+        ));
 
         return (new DriverResource($driver->load('assignedVehicle')))->response()->setStatusCode(201);
     }

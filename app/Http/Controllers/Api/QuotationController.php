@@ -40,12 +40,14 @@ class QuotationController extends Controller
             ]);
         }
 
-        $quotation = Quotation::create([
-            ...$data,
-            'company_id' => $company->id,
-            'quotation_code' => $this->generateQuotationCode($company->id),
-            'status' => $data['status'] ?? 'pending',
-        ]);
+        $quotation = Quotation::create(array_merge(
+            $data,
+            [
+                'company_id' => $company->id,
+                'quotation_code' => $this->generateQuotationCode($company->id),
+                'status' => $data['status'] ?? 'pending',
+            ]
+        ));
 
         return (new QuotationResource($quotation->load('client')))->response()->setStatusCode(201);
     }

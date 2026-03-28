@@ -41,13 +41,15 @@ class TransportServiceController extends Controller
 
         $this->validateRelations($company->id, $data);
 
-        $service = TransportService::create([
-            ...$data,
-            'company_id' => $company->id,
-            'service_code' => $this->generateServiceCode($company->id),
-            'status' => $data['status'] ?? 'pending',
-            'payment_status' => $data['payment_status'] ?? 'pending',
-        ]);
+        $service = TransportService::create(array_merge(
+            $data,
+            [
+                'company_id' => $company->id,
+                'service_code' => $this->generateServiceCode($company->id),
+                'status' => $data['status'] ?? 'pending',
+                'payment_status' => $data['payment_status'] ?? 'pending',
+            ]
+        ));
 
         return (new TransportServiceResource($service->load(['client', 'vehicle', 'driver'])))
             ->response()
