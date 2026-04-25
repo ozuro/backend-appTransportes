@@ -172,6 +172,7 @@ class LucodeSunatServiceTest extends TestCase
                     'xml' => 'https://files.test/f001-12.xml',
                     'cdr' => 'https://files.test/f001-12.zip',
                     'pdf' => [
+                        'ticket' => 'https://files.test/f001-12-ticket.pdf',
                         'a4' => 'https://files.test/f001-12-a4.pdf',
                     ],
                 ],
@@ -260,6 +261,112 @@ class LucodeSunatServiceTest extends TestCase
         $this->assertSame('https://files.test/f001-12.xml', $result['xml_path']);
         $this->assertSame('https://files.test/f001-12.zip', $result['cdr_path']);
         $this->assertSame('https://files.test/f001-12-a4.pdf', $result['pdf_path']);
+        $this->assertTrue($result['accepted']);
+    }
+
+    public function test_send_builds_dispatch_carrier_payload_for_lucode(): void
+    {
+        Config::set('sunat.lucode.service_url', 'https://sandbox.apisunat.test');
+        Config::set('sunat.lucode.api_token', 'token-env-test');
+
+        Http::fake([
+            'https://sandbox.apisunat.test/api/v1/gr-transportista' => Http::response([
+                'success' => true,
+                'message' => 'Guia V001-3 emitida correctamente',
+                'payload' => [
+                    'xml' => 'https://files.test/v001-3.xml',
+                    'cdr' => 'https://files.test/v001-3.zip',
+                    'pdf' => [
+                        'a4' => 'https://files.test/v001-3-a4.pdf',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $company = new Company([
+            'trade_name' => 'Transportes Demo',
+            'legal_name' => 'TRANSPORTES DEMO SAC',
+            'ruc' => '20123456789',
+            'address' => 'Av. Transportista 100',
+            'currency_code' => 'PEN',
+        ]);
+
+        $client = new Client([
+            'name' => 'Empresa Cliente',
+            'business_name' => 'EMPRESA CLIENTE SAC',
+            'document_type' => 'RUC',
+            'document_number' => '20601234567',
+        ]);
+
+        $document = new ElectronicDocument([
+            'document_type' => 'dispatch_carrier',
+            'series' => 'V001',
+            'correlative' => 3,
+            'issue_date' => Carbon::parse('2026-04-02'),
+            'currency_code' => 'PEN',
+            'subtotal_amount' => 0,
+            'tax_amount' => 0,
+            'total_amount' => 0,
+            'payload' => [
+                'guide' => [
+                    'remitente_numero_de_documento' => '20601234567',
+                    'remitente_denominacion' => 'EMPRESA CLIENTE SAC',
+                    'destinatario_numero_de_documento' => '20601234567',
+                    'destinatario_denominacion' => 'EMPRESA CLIENTE SAC',
+                    'punto_de_partida_ubigeo' => '150101',
+                    'punto_de_partida_direccion' => 'Av. Origen 100',
+                    'punto_de_llegada_ubigeo' => '070101',
+                    'punto_de_llegada_direccion' => 'Av. Destino 200',
+                    'numero_de_placa' => 'ABC123',
+                    'conductor_numero_de_documento' => '12345678',
+                    'conductor_nombres' => 'JUAN',
+                    'conductor_apellidos' => 'PEREZ',
+                    'conductor_numero_de_licencia' => 'Q12345678',
+                    'peso_bruto_total' => 1200,
+                    'numero_registro_MTC_transportista' => '1512345CNG',
+                ],
+                'items' => [
+                    [
+                        'quantity' => 1,
+                        'unit_code' => 'NIU',
+                        'description' => 'Carga transportada',
+                    ],
+                ],
+            ],
+        ]);
+        $document->setRelation('company', $company);
+        $document->setRelation('client', $client);
+
+        $config = new ElectronicBillingConfig([
+            'environment' => 'beta',
+            'office_ubigeo' => '150101',
+            'office_district' => 'LIMA',
+            'office_province' => 'LIMA',
+            'office_department' => 'LIMA',
+            'extra_settings' => [
+                'provider' => 'lucode',
+            ],
+        ]);
+
+        $result = app(LucodeSunatService::class)->send($document, $config);
+
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return $request->url() === 'https://sandbox.apisunat.test/api/v1/gr-transportista'
+                && ($data['numeracion'] ?? null) === 'V001-3'
+                && ($data['numero_ruc_transportista'] ?? null) === '20123456789'
+                && ($data['numero_registro_MTC_transportista'] ?? null) === '1512345CNG'
+                && ($data['numero_documento_identidad_remitente'] ?? null) === '20601234567'
+                && ($data['ubigeo_punto_partida'] ?? null) === '150101'
+                && ($data['numero_placa_vehiculo_principal'] ?? null) === 'ABC123'
+                && ($data['numero_documento_identidad_conductor_principal'] ?? null) === '12345678'
+                && ($data['peso_bruto_total_carga'] ?? null) === '1200.000'
+                && ($data['items'][0]['descripcion'] ?? null) === 'Carga transportada';
+        });
+
+        $this->assertSame('ACEPTADO', $result['sunat_response_code']);
+        $this->assertSame('https://files.test/v001-3-a4.pdf', $result['pdf_path']);
         $this->assertTrue($result['accepted']);
     }
 

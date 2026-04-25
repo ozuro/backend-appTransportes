@@ -37,8 +37,11 @@ class ElectronicDocumentResource extends JsonResource
                 return [
                     'id' => $this->client?->id,
                     'name' => $this->client?->name,
+                    'business_name' => $this->client?->business_name,
                     'document_type' => $this->client?->document_type,
                     'document_number' => $this->client?->document_number,
+                    'ruc' => $this->client?->ruc,
+                    'dni' => $this->client?->dni,
                 ];
             }),
             'transport_service' => $this->whenLoaded('transportService', function () {

@@ -32,6 +32,26 @@ class Client extends Model
         'is_active' => 'boolean',
     ];
 
+    public function getRucAttribute(): ?string
+    {
+        $number = preg_replace('/\D+/', '', (string) $this->document_number);
+        $type = strtoupper((string) $this->document_type);
+
+        return $number !== '' && (in_array($type, ['RUC', '6'], true) || strlen($number) === 11)
+            ? $number
+            : null;
+    }
+
+    public function getDniAttribute(): ?string
+    {
+        $number = preg_replace('/\D+/', '', (string) $this->document_number);
+        $type = strtoupper((string) $this->document_type);
+
+        return $number !== '' && (in_array($type, ['DNI', '1'], true) || strlen($number) === 8)
+            ? $number
+            : null;
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

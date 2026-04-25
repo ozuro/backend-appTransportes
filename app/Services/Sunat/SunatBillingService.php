@@ -258,12 +258,16 @@ class SunatBillingService
             return $config?->invoice_series ?: 'F001';
         }
 
+        if ($documentType === 'dispatch_carrier') {
+            return 'V001';
+        }
+
         return $config?->receipt_series ?: 'B001';
     }
 
     private function buildPayload(Company $company, array $data, string $series): array
     {
-        return [
+        $payload = [
             'company' => Arr::only($company->toArray(), [
                 'id',
                 'trade_name',
@@ -292,6 +296,13 @@ class SunatBillingService
             'lines' => $data['payload']['lines'] ?? [],
             'meta' => $data['payload']['meta'] ?? [],
         ];
+
+        if ($data['document_type'] === 'dispatch_carrier') {
+            $payload['guide'] = $data['payload']['guide'] ?? [];
+            $payload['items'] = $data['payload']['items'] ?? [];
+        }
+
+        return $payload;
     }
 
     private function nextCorrelative(ElectronicDocument $document): int
@@ -302,7 +313,9 @@ class SunatBillingService
         $config = ElectronicBillingConfig::firstWhere('company_id', $document->company_id);
         $ultimoConfigurado = $document->document_type === 'invoice'
             ? (int) ($config?->initial_invoice_correlative ?? 0)
-            : (int) ($config?->initial_receipt_correlative ?? 0);
+            : ($document->document_type === 'receipt'
+                ? (int) ($config?->initial_receipt_correlative ?? 0)
+                : 0);
 
         return max($ultimoLocal, $ultimoConfigurado) + 1;
     }
@@ -322,12 +335,21 @@ class SunatBillingService
 
     private function validateDocumentType(Client $client, string $documentType): void
     {
-        $clientDocumentType = strtoupper((string) $client->document_type);
+        if ($documentType === 'dispatch_carrier') {
+            return;
+        }
 
-        if ($documentType === 'invoice' && $clientDocumentType !== 'RUC') {
+        $clientDocumentType = $this->normalizeClientDocumentType(
+            $client->document_type,
+            $client->document_number
+        );
+        $clientDocumentNumber = preg_replace('/\D+/', '', (string) $client->document_number);
+
+        if ($documentType === 'invoice' &&
+            ($clientDocumentType !== 'RUC' || strlen($clientDocumentNumber) !== 11)) {
             throw ValidationException::withMessages([
                 'document_type' => [
-                    'Para emitir factura el cliente debe tener RUC. Use boleta o actualice el cliente.',
+                    'Para emitir factura el cliente debe tener RUC de 11 digitos. Actualice el cliente antes de emitir.',
                 ],
             ]);
         }
@@ -339,5 +361,21 @@ class SunatBillingService
                 ],
             ]);
         }
+    }
+
+    private function normalizeClientDocumentType(?string $documentType, ?string $documentNumber = null): string
+    {
+        $type = strtoupper(trim((string) $documentType));
+        $digits = preg_replace('/\D+/', '', (string) $documentNumber);
+
+        if (in_array($type, ['6', 'RUC'], true) || strlen($digits) === 11) {
+            return 'RUC';
+        }
+
+        if (in_array($type, ['1', 'DNI'], true) || strlen($digits) === 8) {
+            return 'DNI';
+        }
+
+        return $type;
     }
 }

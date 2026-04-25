@@ -12,6 +12,7 @@ use App\Models\TransportService;
 use App\Models\Vehicle;
 use App\Services\Tenant\CompanyContextService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -27,12 +28,21 @@ class TransportServiceController extends Controller
     {
         $company = $this->companyContext->resolve($request, $request->user());
 
-        return TransportServiceResource::collection(
-            TransportService::with($this->serviceRelations())
-                ->where('company_id', $company->id)
-                ->latest()
-                ->paginate(20)
-        );
+        try {
+            return TransportServiceResource::collection(
+                $this->servicesQuery($company->id, $this->serviceRelations())
+                    ->paginate(20)
+            );
+        } catch (QueryException $exception) {
+            if (! $this->isMissingSettlementTableException($exception)) {
+                throw $exception;
+            }
+
+            return TransportServiceResource::collection(
+                $this->servicesQuery($company->id, $this->baseServiceRelations())
+                    ->paginate(20)
+            );
+        }
     }
 
     public function store(StoreTransportServiceRequest $request): JsonResponse
@@ -52,7 +62,7 @@ class TransportServiceController extends Controller
             ]
         ));
 
-        return (new TransportServiceResource($service->load($this->serviceRelations())))
+        return (new TransportServiceResource($this->loadServiceRelations($service)))
             ->response()
             ->setStatusCode(201);
     }
@@ -62,7 +72,7 @@ class TransportServiceController extends Controller
         $company = $this->companyContext->resolve($request, $request->user());
         abort_unless($service->company_id === $company->id, 404);
 
-        return new TransportServiceResource($service->load($this->serviceRelations()));
+        return new TransportServiceResource($this->loadServiceRelations($service));
     }
 
     public function update(UpdateTransportServiceRequest $request, TransportService $service)
@@ -75,7 +85,7 @@ class TransportServiceController extends Controller
 
         $service->update($data);
 
-        return new TransportServiceResource($service->fresh()->load($this->serviceRelations()));
+        return new TransportServiceResource($this->loadServiceRelations($service->fresh()));
     }
 
     public function destroy(Request $request, TransportService $service): JsonResponse
@@ -125,12 +135,56 @@ class TransportServiceController extends Controller
      */
     private function serviceRelations(): array
     {
-        $relations = ['client', 'vehicle', 'driver'];
+        $relations = $this->baseServiceRelations();
 
-        if (Schema::hasTable('service_settlements')) {
+        if ($this->settlementsTableExists()) {
             $relations[] = 'settlement';
         }
 
         return $relations;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function baseServiceRelations(): array
+    {
+        return ['client', 'vehicle', 'driver'];
+    }
+
+    private function servicesQuery(int $companyId, array $relations)
+    {
+        return TransportService::with($relations)
+            ->where('company_id', $companyId)
+            ->latest();
+    }
+
+    private function loadServiceRelations(?TransportService $service): TransportService
+    {
+        abort_unless($service instanceof TransportService, 404);
+
+        try {
+            return $service->load($this->serviceRelations());
+        } catch (QueryException $exception) {
+            if (! $this->isMissingSettlementTableException($exception)) {
+                throw $exception;
+            }
+
+            return $service->load($this->baseServiceRelations());
+        }
+    }
+
+    private function settlementsTableExists(): bool
+    {
+        try {
+            return Schema::hasTable('service_settlements');
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function isMissingSettlementTableException(QueryException $exception): bool
+    {
+        return str_contains($exception->getMessage(), 'service_settlements');
     }
 }

@@ -28,6 +28,20 @@ class TransportServiceResourceTest extends TestCase
         $this->assertSame(['client', 'vehicle', 'driver'], $method->invoke($controller));
     }
 
+    public function test_service_relations_skip_settlement_when_schema_check_fails(): void
+    {
+        Schema::shouldReceive('hasTable')
+            ->once()
+            ->with('service_settlements')
+            ->andThrow(new \RuntimeException('schema unavailable'));
+
+        $controller = new TransportServiceController(app(CompanyContextService::class));
+        $method = new ReflectionMethod($controller, 'serviceRelations');
+        $method->setAccessible(true);
+
+        $this->assertSame(['client', 'vehicle', 'driver'], $method->invoke($controller));
+    }
+
     public function test_resource_omits_settlement_when_relation_is_not_loaded(): void
     {
         $payload = $this->resolveResource($this->fakeTransportService());

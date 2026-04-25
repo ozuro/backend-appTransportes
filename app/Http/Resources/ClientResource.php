@@ -14,6 +14,8 @@ class ClientResource extends JsonResource
             'client_type' => $this->client_type,
             'document_type' => $this->document_type,
             'document_number' => $this->document_number,
+            'ruc' => $this->ruc,
+            'dni' => $this->dni,
             'name' => $this->name,
             'business_name' => $this->business_name,
             'email' => $this->email,
