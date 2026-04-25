@@ -38,4 +38,58 @@ class ElectronicBillingConfig extends Model
     {
         return $this->belongsTo(Company::class);
     }
+
+    public function getProviderAttribute(): string
+    {
+        return (string) data_get($this->extra_settings, 'provider', 'greenter');
+    }
+
+    public function getApiBaseUrlAttribute(): ?string
+    {
+        return data_get($this->extra_settings, 'api_base_url');
+    }
+
+    public function getApiTokenAttribute(): ?string
+    {
+        return data_get($this->extra_settings, 'api_token');
+    }
+
+    public function getSireClientIdAttribute(): ?string
+    {
+        return data_get($this->extra_settings, 'sire_client_id');
+    }
+
+    public function getSireClientSecretAttribute(): ?string
+    {
+        return data_get($this->extra_settings, 'sire_client_secret');
+    }
+
+    public function getSireUsernameAttribute(): ?string
+    {
+        return data_get($this->extra_settings, 'sire_username');
+    }
+
+    public function getSireSalesEndpointAttribute(): ?string
+    {
+        return data_get($this->extra_settings, 'sire_sales_endpoint');
+    }
+
+    public function getSirePurchasesEndpointAttribute(): ?string
+    {
+        return data_get($this->extra_settings, 'sire_purchases_endpoint');
+    }
+
+    public function getInitialReceiptCorrelativeAttribute(): ?int
+    {
+        $value = data_get($this->extra_settings, 'initial_receipt_correlative');
+
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    public function getInitialInvoiceCorrelativeAttribute(): ?int
+    {
+        $value = data_get($this->extra_settings, 'initial_invoice_correlative');
+
+        return is_numeric($value) ? (int) $value : null;
+    }
 }

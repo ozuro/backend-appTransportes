@@ -77,4 +77,27 @@ class Company extends Model
     {
         return $this->hasMany(OperatingExpense::class);
     }
+
+    public function cashIncomes()
+    {
+        return $this->hasMany(CashIncome::class);
+    }
+
+    /**
+     * Historial de asignaciones entre choferes y unidades de la empresa.
+     * Esto soporta tiempo completo, medio tiempo o relevo.
+     */
+    public function driverVehicleAssignments()
+    {
+        return $this->hasMany(DriverVehicleAssignment::class);
+    }
+
+    /**
+     * Liquidaciones por servicio para separar montos de empresa,
+     * propietario y chofer sin mezclar la caja general.
+     */
+    public function serviceSettlements()
+    {
+        return $this->hasMany(ServiceSettlement::class);
+    }
 }

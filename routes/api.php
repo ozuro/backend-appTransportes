@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientController;
+use App\Http\Controllers\Api\CashIncomeController;
 use App\Http\Controllers\Api\DriverController;
 use App\Http\Controllers\Api\OperatingExpenseController;
 use App\Http\Controllers\Api\QuotationController;
 use App\Http\Controllers\Api\Sunat\ElectronicDocumentController;
+use App\Http\Controllers\Api\Sunat\SireController;
 use App\Http\Controllers\Api\Sunat\SunatConfigController;
 use App\Http\Controllers\Api\Sunat\SunatDemoController;
 use App\Http\Controllers\Api\TransportServiceController;
@@ -43,6 +45,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('services', TransportServiceController::class);
         Route::apiResource('quotations', QuotationController::class);
         Route::apiResource('expenses', OperatingExpenseController::class);
+        Route::apiResource('cash-incomes', CashIncomeController::class);
 
         Route::prefix('sunat')->group(function () {
             Route::get('/config', [SunatConfigController::class, 'show']);
@@ -52,6 +55,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/documents', [ElectronicDocumentController::class, 'store']);
             Route::get('/documents/{document}', [ElectronicDocumentController::class, 'show']);
             Route::post('/documents/{document}/send', [ElectronicDocumentController::class, 'send']);
+            Route::get('/sire/summary', [SireController::class, 'summary']);
+            Route::get('/sire/rvie', [SireController::class, 'sales']);
+            Route::get('/sire/rce', [SireController::class, 'purchases']);
         });
     });
 });

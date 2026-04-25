@@ -60,4 +60,36 @@ class User extends Authenticatable
             ->withPivot(['role_id', 'is_owner', 'is_active', 'joined_at'])
             ->withTimestamps();
     }
+
+    /**
+     * Unidades donde el usuario es el responsable o propietario economico.
+     */
+    public function ownedVehicles()
+    {
+        return $this->hasMany(Vehicle::class, 'owner_user_id');
+    }
+
+    /**
+     * Asignaciones creadas por el usuario administrador o coordinador.
+     */
+    public function assignedDriverVehicleAssignments()
+    {
+        return $this->hasMany(DriverVehicleAssignment::class, 'assigned_by_user_id');
+    }
+
+    /**
+     * Liquidaciones registradas por este usuario.
+     */
+    public function recordedServiceSettlements()
+    {
+        return $this->hasMany(ServiceSettlement::class, 'recorded_by_user_id');
+    }
+
+    /**
+     * Ingresos de caja registrados por este usuario.
+     */
+    public function recordedCashIncomes()
+    {
+        return $this->hasMany(CashIncome::class, 'recorded_by_user_id');
+    }
 }

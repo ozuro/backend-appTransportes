@@ -11,6 +11,7 @@ class Vehicle extends Model
 
     protected $fillable = [
         'company_id',
+        'owner_user_id',
         'unit_type',
         'plate',
         'brand',
@@ -22,6 +23,7 @@ class Vehicle extends Model
         'soat_expires_at',
         'technical_review_expires_at',
         'operational_status',
+        'management_mode',
         'estimated_cost_per_km',
         'estimated_cost_per_service',
         'is_active',
@@ -44,13 +46,28 @@ class Vehicle extends Model
         return $this->belongsTo(Company::class);
     }
 
+    public function ownerUser()
+    {
+        return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
     public function drivers()
     {
         return $this->hasMany(Driver::class, 'assigned_vehicle_id');
     }
 
+    public function driverAssignments()
+    {
+        return $this->hasMany(DriverVehicleAssignment::class);
+    }
+
     public function transportServices()
     {
         return $this->hasMany(TransportService::class);
+    }
+
+    public function serviceSettlements()
+    {
+        return $this->hasMany(ServiceSettlement::class);
     }
 }

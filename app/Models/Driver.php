@@ -47,8 +47,18 @@ class Driver extends Model
         return $this->belongsTo(Vehicle::class, 'assigned_vehicle_id');
     }
 
+    public function vehicleAssignments()
+    {
+        return $this->hasMany(DriverVehicleAssignment::class);
+    }
+
     public function transportServices()
     {
         return $this->hasMany(TransportService::class);
+    }
+
+    public function serviceSettlements()
+    {
+        return $this->hasMany(ServiceSettlement::class);
     }
 }

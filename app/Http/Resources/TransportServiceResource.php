@@ -14,6 +14,12 @@ class TransportServiceResource extends JsonResource
             'client_id' => $this->client_id,
             'vehicle_id' => $this->vehicle_id,
             'driver_id' => $this->driver_id,
+            'vehicle_plate' => $this->vehicle?->plate,
+            'vehicle_unit_type' => $this->vehicle?->unit_type,
+            'driver_name' => trim(collect([
+                $this->driver?->first_name,
+                $this->driver?->last_name,
+            ])->filter()->implode(' ')),
             'service_code' => $this->service_code,
             'service_type' => $this->service_type,
             'status' => $this->status,
@@ -51,6 +57,9 @@ class TransportServiceResource extends JsonResource
                     'first_name' => $this->driver?->first_name,
                     'last_name' => $this->driver?->last_name,
                 ];
+            }),
+            'settlement' => $this->whenLoaded('settlement', function () {
+                return ServiceSettlementResource::make($this->settlement);
             }),
         ];
     }

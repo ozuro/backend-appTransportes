@@ -61,4 +61,9 @@ class TransportService extends Model
     {
         return $this->belongsTo(Driver::class);
     }
+
+    public function settlement()
+    {
+        return $this->hasOne(ServiceSettlement::class);
+    }
 }

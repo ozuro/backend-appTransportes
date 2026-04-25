@@ -11,6 +11,7 @@ class VehicleResource extends JsonResource
         return [
             'id' => $this->id,
             'company_id' => $this->company_id,
+            'owner_user_id' => $this->owner_user_id,
             'unit_type' => $this->unit_type,
             'plate' => $this->plate,
             'brand' => $this->brand,
@@ -22,6 +23,7 @@ class VehicleResource extends JsonResource
             'soat_expires_at' => $this->soat_expires_at,
             'technical_review_expires_at' => $this->technical_review_expires_at,
             'operational_status' => $this->operational_status,
+            'management_mode' => $this->management_mode,
             'estimated_cost_per_km' => $this->estimated_cost_per_km,
             'estimated_cost_per_service' => $this->estimated_cost_per_service,
             'is_active' => $this->is_active,

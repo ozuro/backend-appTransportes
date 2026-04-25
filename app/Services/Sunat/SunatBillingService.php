@@ -16,29 +16,64 @@ use Illuminate\Validation\ValidationException;
 class SunatBillingService
 {
     public function __construct(
-        private GreenterSunatService $greenterSunatService
+        private GreenterSunatService $greenterSunatService,
+        private LucodeSunatService $lucodeSunatService
     ) {
     }
 
     public function upsertConfig(Company $company, array $data): ElectronicBillingConfig
     {
+        $existing = ElectronicBillingConfig::firstWhere('company_id', $company->id);
+
+        $extraSettings = array_merge(
+            ['provider' => 'greenter'],
+            (array) $existing?->extra_settings,
+            (array) ($data['extra_settings'] ?? [])
+        );
+
         $payload = array_merge(
             [
-                'environment' => config('sunat.default_environment', 'beta'),
-                'office_country_code' => 'PE',
-                'invoice_series' => 'F001',
-                'receipt_series' => 'B001',
-                'is_active' => false,
+                'environment' => $existing?->environment ?: config('sunat.default_environment', 'beta'),
+                'sol_user' => $existing?->sol_user,
+                'sol_password' => $existing?->sol_password,
+                'certificate_path' => $existing?->certificate_path,
+                'certificate_password' => $existing?->certificate_password,
+                'office_ubigeo' => $existing?->office_ubigeo,
+                'office_address' => $existing?->office_address,
+                'office_urbanization' => $existing?->office_urbanization,
+                'office_district' => $existing?->office_district,
+                'office_province' => $existing?->office_province,
+                'office_department' => $existing?->office_department,
+                'office_country_code' => $existing?->office_country_code ?: 'PE',
+                'invoice_series' => $existing?->invoice_series ?: 'F001',
+                'receipt_series' => $existing?->receipt_series ?: 'B001',
+                'is_active' => $existing?->is_active ?? false,
+                'extra_settings' => $extraSettings,
             ],
-            $data
+            array_filter(
+                $data,
+                static fn ($value) => $value !== null
+            )
         );
+
+        $payload['invoice_series'] = strtoupper((string) ($payload['invoice_series'] ?? 'F001'));
+        $payload['receipt_series'] = strtoupper((string) ($payload['receipt_series'] ?? 'B001'));
+
+        if (($payload['extra_settings']['provider'] ?? 'greenter') === 'lucode' &&
+            ! preg_match('/^B[A-Z0-9]{3}$/', $payload['receipt_series'])) {
+            $payload['receipt_series'] = 'B001';
+        }
+
+        if (($payload['extra_settings']['provider'] ?? 'greenter') === 'lucode' &&
+            ! preg_match('/^F[A-Z0-9]{3}$/', $payload['invoice_series'])) {
+            $payload['invoice_series'] = 'F001';
+        }
 
         return ElectronicBillingConfig::updateOrCreate(
             ['company_id' => $company->id],
             $payload
         );
     }
-
     public function createDraft(Company $company, array $data): ElectronicDocument
     {
         $this->validateOwnership($company, $data);
@@ -71,18 +106,18 @@ class SunatBillingService
                 'ready_for_beta' => false,
                 'ready_for_production' => false,
                 'missing' => [
-                    'sol_credentials',
                     'office_address',
                     'office_ubigeo',
                     'series',
-                    'certificate',
+                    'provider_config',
                 ],
             ];
         }
 
         $missing = [];
+        $provider = $config->provider;
 
-        if (! filled($config->sol_user) || ! filled($config->sol_password)) {
+        if ($provider === 'greenter' && (! filled($config->sol_user) || ! filled($config->sol_password))) {
             $missing[] = 'sol_credentials';
         }
 
@@ -98,9 +133,24 @@ class SunatBillingService
             $missing[] = 'series';
         }
 
-        $certificateReady = filled($config->certificate_path) && is_file($config->certificate_path);
-        if (! $certificateReady) {
-            $missing[] = 'certificate';
+        if ($provider === 'greenter') {
+            $certificateReady = filled($config->certificate_path) && is_file($config->certificate_path);
+            if (! $certificateReady) {
+                $missing[] = 'certificate';
+            }
+        }
+
+        if ($provider === 'lucode') {
+            if (! filled($config->api_base_url) &&
+                ! filled(config('sunat.lucode.service_url')) &&
+                ! filled(config('sunat.lucode.sandbox_url')) &&
+                ! filled(config('sunat.lucode.production_url'))) {
+                $missing[] = 'api_base_url';
+            }
+
+            if (! filled($config->api_token) && ! filled(config('sunat.lucode.api_token'))) {
+                $missing[] = 'api_token';
+            }
         }
 
         return [
@@ -132,19 +182,45 @@ class SunatBillingService
             $document->save();
         }
 
-        $xmlPreview = $this->greenterSunatService->generateSignedXml($document, $config);
-        $previewPath = $this->storePreviewXml($document, $xmlPreview);
-        $sendResult = $this->greenterSunatService->send($document, $config);
-        $cdrResponse = $sendResult['cdr_response'];
+        $provider = $config->provider;
+        $previewPath = null;
+        $sendResult = [];
+        $cdrResponse = null;
+
+        if ($provider === 'lucode') {
+            $sendResult = $this->lucodeSunatService->send($document, $config);
+        } else {
+            $xmlPreview = $this->greenterSunatService->generateSignedXml($document, $config);
+            $previewPath = $this->storePreviewXml($document, $xmlPreview);
+            $sendResult = $this->greenterSunatService->send($document, $config);
+            $cdrResponse = $sendResult['cdr_response'];
+        }
+
+        $accepted = $provider === 'lucode'
+            ? ($sendResult['accepted'] ?? false)
+            : $cdrResponse?->isAccepted();
 
         $document->forceFill([
-            'status' => $cdrResponse?->isAccepted() ? 'accepted' : 'sent',
+            'status' => $accepted ? 'accepted' : 'sent',
             'xml_path' => $sendResult['xml_path'] ?? $previewPath,
             'cdr_path' => $sendResult['cdr_path'] ?? null,
-            'sunat_response_code' => $cdrResponse?->getCode(),
-            'sunat_response_message' => $cdrResponse?->getDescription(),
+            'pdf_path' => $sendResult['pdf_path'] ?? $document->pdf_path,
+            'sunat_ticket' => $sendResult['sunat_ticket'] ?? $document->sunat_ticket,
+            'sunat_response_code' => $provider === 'lucode'
+                ? ($sendResult['sunat_response_code'] ?? null)
+                : $cdrResponse?->getCode(),
+            'sunat_response_message' => $provider === 'lucode'
+                ? ($sendResult['sunat_response_message'] ?? null)
+                : $cdrResponse?->getDescription(),
+            'payload' => $provider === 'lucode'
+                ? array_merge($document->payload ?? [], [
+                    'provider' => 'lucode',
+                    'provider_request' => $sendResult['request_payload'] ?? [],
+                    'provider_response' => $sendResult['response_body'] ?? [],
+                ])
+                : $document->payload,
             'sent_at' => now(),
-            'accepted_at' => $cdrResponse?->isAccepted() ? now() : null,
+            'accepted_at' => $accepted ? now() : null,
         ])->save();
 
         return $document->fresh(['client', 'transportService', 'quotation']);
@@ -220,9 +296,15 @@ class SunatBillingService
 
     private function nextCorrelative(ElectronicDocument $document): int
     {
-        return (int) ElectronicDocument::where('company_id', $document->company_id)
+        $ultimoLocal = (int) ElectronicDocument::where('company_id', $document->company_id)
             ->where('series', $document->series)
-            ->max('correlative') + 1;
+            ->max('correlative');
+        $config = ElectronicBillingConfig::firstWhere('company_id', $document->company_id);
+        $ultimoConfigurado = $document->document_type === 'invoice'
+            ? (int) ($config?->initial_invoice_correlative ?? 0)
+            : (int) ($config?->initial_receipt_correlative ?? 0);
+
+        return max($ultimoLocal, $ultimoConfigurado) + 1;
     }
 
     private function storePreviewXml(ElectronicDocument $document, string $xml): string

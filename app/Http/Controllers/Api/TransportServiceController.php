@@ -13,6 +13,7 @@ use App\Models\Vehicle;
 use App\Services\Tenant\CompanyContextService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class TransportServiceController extends Controller
@@ -27,7 +28,7 @@ class TransportServiceController extends Controller
         $company = $this->companyContext->resolve($request, $request->user());
 
         return TransportServiceResource::collection(
-            TransportService::with(['client', 'vehicle', 'driver'])
+            TransportService::with($this->serviceRelations())
                 ->where('company_id', $company->id)
                 ->latest()
                 ->paginate(20)
@@ -51,7 +52,7 @@ class TransportServiceController extends Controller
             ]
         ));
 
-        return (new TransportServiceResource($service->load(['client', 'vehicle', 'driver'])))
+        return (new TransportServiceResource($service->load($this->serviceRelations())))
             ->response()
             ->setStatusCode(201);
     }
@@ -61,7 +62,7 @@ class TransportServiceController extends Controller
         $company = $this->companyContext->resolve($request, $request->user());
         abort_unless($service->company_id === $company->id, 404);
 
-        return new TransportServiceResource($service->load(['client', 'vehicle', 'driver']));
+        return new TransportServiceResource($service->load($this->serviceRelations()));
     }
 
     public function update(UpdateTransportServiceRequest $request, TransportService $service)
@@ -74,7 +75,7 @@ class TransportServiceController extends Controller
 
         $service->update($data);
 
-        return new TransportServiceResource($service->fresh()->load(['client', 'vehicle', 'driver']));
+        return new TransportServiceResource($service->fresh()->load($this->serviceRelations()));
     }
 
     public function destroy(Request $request, TransportService $service): JsonResponse
@@ -114,5 +115,22 @@ class TransportServiceController extends Controller
         $nextId = (TransportService::max('id') ?? 0) + 1;
 
         return $prefix . '-' . str_pad((string) $nextId, 6, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Mantiene compatibilidad mientras las tablas nuevas se despliegan.
+     * Si service_settlements aun no existe, la API sigue respondiendo sin esa relacion.
+     *
+     * @return array<int, string>
+     */
+    private function serviceRelations(): array
+    {
+        $relations = ['client', 'vehicle', 'driver'];
+
+        if (Schema::hasTable('service_settlements')) {
+            $relations[] = 'settlement';
+        }
+
+        return $relations;
     }
 }
